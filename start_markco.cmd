@@ -1,6 +1,6 @@
 @echo off
 TITLE Markco Hub Terminal
-SET REPO_DIR=C:\Users\Markco Ella\Desktop\clawMarkco\
+SET "REPO_DIR=%~dp0"
 cd /d "%REPO_DIR%"
 echo ============================================================
 echo  [MARKCO HUB] Starting up...

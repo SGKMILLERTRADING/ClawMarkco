@@ -4,7 +4,7 @@
 # ============================================================
 
 $TaskName      = "MarkcoHub"
-$ScriptDir     = "C:\Users\Markco Ella\Desktop\clawMarkco"
+$ScriptDir     = "$PSScriptRoot"
 $HubScript     = "$ScriptDir\markco_hub.js"
 $LogFile       = "$ScriptDir\hub_output.log"
 $NodePath      = (Get-Command node -ErrorAction SilentlyContinue).Source
