@@ -25,8 +25,7 @@ schtasks /Delete /TN "MarkcoDaemon_Repeat" /F 2>$null | Out-Null
 Write-Host "[Markco] Cleared any previous task registrations." -ForegroundColor Yellow
 
 # Build Command
-# /B runs in background (minimized)
-$RunCmd = "cmd /c node `"$HubScript`" >> `"$LogFile`" 2>&1"
+$RunCmd = "`"$ScriptDir\markco_job.cmd`""
 
 # Create the logon trigger (standard user permissions)
 # We don't use /RL HIGHEST because that requires Admin.
