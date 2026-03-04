@@ -15,7 +15,7 @@ const axios = require('axios');
 
 // --- Configuration ---
 const REPO_DIR = __dirname;
-const BRANCH_TO_WATCH = 'Development';
+const BRANCH_TO_WATCH = 'main';
 const POLL_INTERVAL = 1000 * 60 * 15; // 15 minutes
 const TG_TOKEN = '8652394835:AAG4K5PE4FlXM5jYo5tUxpL3EQjmv2hO1xI';
 const OPENCLAW_URL = 'http://localhost:18789/v1/chat/completions';
