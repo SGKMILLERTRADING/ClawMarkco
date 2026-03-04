@@ -1,0 +1,7 @@
+node_modules/
+*.log
+markco_memory.json
+package-lock.json
+GoogleDrive/
+.gemini/
+.openclaw/
