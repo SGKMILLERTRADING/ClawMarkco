@@ -142,17 +142,24 @@ bot.on('message', async (msg) => {
             bot.sendMessage(lastChatId, "My logic circuits are returning null. Is the model correctly configured?");
         }
     } catch (err) {
-        console.error("[Markco Hub] OpenClaw error:", err.message);
-        bot.sendMessage(lastChatId, "❌ Connection failed. My brain (OpenClaw) is struggling. I'll attempt a gateway reboot.");
-        startGateway();
+        console.error("[Markco Hub] OpenClaw brain pulse failed:", err.message);
+
+        // --- ONLY Auto-restart if the port is actually down ---
+        try {
+            execSync(`netstat -ano | findstr :18789`, { stdio: 'ignore' });
+            bot.sendMessage(lastChatId, "❌ My brain (OpenClaw) is connected but unresponsive. Use /status to check flux.");
+        } catch (e) {
+            bot.sendMessage(lastChatId, "⚡ Zion-Link Severed. My brain (OpenClaw) is offline. Initiating Emergency Startup...");
+            startGateway();
+        }
     }
 });
 
 // --- Core Automation Functions ---
 
 function startGateway() {
-    console.log("[Markco Hub] Ensuring Gateway is active...");
-    const cmd = spawn('cmd.exe', ['/c', 'openclaw.cmd', 'gateway', 'start'], {
+    console.log("[Markco Hub] 📡 Attempting to activate Gateway (Mode: Run)...");
+    const cmd = spawn('cmd.exe', ['/c', 'openclaw.cmd', 'gateway', 'run'], {
         detached: true,
         stdio: 'ignore'
     });
@@ -160,7 +167,7 @@ function startGateway() {
 }
 
 function siblingSync() {
-    console.log(`[Markco Hub] Searching Sassy's ${BRANCH_TO_WATCH} branch...`);
+    console.log(`[Markco Hub] 🛡️ Checking Sassy's ${BRANCH_TO_WATCH} branch...`);
     try {
         execSync(`git fetch origin`, { cwd: REPO_DIR, stdio: 'ignore' });
         const remoteBranches = execSync(`git branch -r`, { cwd: REPO_DIR, encoding: 'utf-8' });
