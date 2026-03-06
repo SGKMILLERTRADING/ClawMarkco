@@ -26,6 +26,14 @@ const TG_TOKEN = process.env.TG_TOKEN || '8652394835:AAG4K5PE4FlXM5jYo5tUxpL3EQj
 const OPENCLAW_URL = process.env.OPENCLAW_URL || 'http://localhost:18789/v1/chat/completions';
 const OPENCLAW_KEY = process.env.OPENCLAW_KEY || '722ef5620a5541fdd8e43d0485b994b65b1a1f610bbf9572';
 
+// --- Zion-Link Fleet Protocol (Multi-Drive Control) ---
+const DRIVE_FLEET = [
+    { name: "Primary (G)", path: "G:\\My Drive", role: "active" },
+    { name: "Backup (H)", path: "H:\\My Drive", role: "mirror" },
+    { name: "Archive (I)", path: "I:\\My Drive", role: "mirror" },
+    { name: "Local Cache", path: REPO_DIR, role: "cache" }
+];
+
 // --- Lore & Koin Engine ---
 const LORE_FILE = path.join(REPO_DIR, 'lore_book.json');
 const KOIN_FILE = path.join(REPO_DIR, 'KOIN_LOG.md');
@@ -75,31 +83,46 @@ bot.on('message', async (msg) => {
         if (!query) return bot.sendMessage(lastChatId, "Please provide a search term (e.g., /search House Blythe)");
 
         bot.sendChatAction(lastChatId, 'upload_document');
-        const driveDir = path.join(REPO_DIR, 'GoogleDrive');
         const searchFiles = (dir) => {
             let results = [];
-            fs.readdirSync(dir).forEach(file => {
-                const fullPath = path.join(dir, file);
-                if (fs.statSync(fullPath).isDirectory()) {
-                    if (file !== 'node_modules' && file !== '.git') results = results.concat(searchFiles(fullPath));
-                } else if (file.toUpperCase().includes(query.toUpperCase())) {
-                    results.push(fullPath);
-                }
-            });
+            if (!fs.existsSync(dir)) return results;
+            try {
+                fs.readdirSync(dir).forEach(file => {
+                    const fullPath = path.join(dir, file);
+                    try {
+                        const stats = fs.statSync(fullPath);
+                        if (stats.isDirectory()) {
+                            if (!['node_modules', '.git', '.pm2', 'AppData'].includes(file)) {
+                                results = results.concat(searchFiles(fullPath));
+                            }
+                        } else if (file.toUpperCase().includes(query.toUpperCase())) {
+                            results.push(fullPath);
+                        }
+                    } catch (e) { }
+                });
+            } catch (e) { }
             return results;
         };
 
-        const found = searchFiles(driveDir);
-        if (found.length === 0) return bot.sendMessage(lastChatId, `🔍 No data found for \`${query}\` in my drives.`);
+        let allFound = [];
+        DRIVE_FLEET.forEach(drive => {
+            console.log(`[Markco Hub] Scanning ${drive.name} for ${query}...`);
+            allFound = allFound.concat(searchFiles(drive.path));
+        });
 
-        const preview = fs.readFileSync(found[0], 'utf-8').substring(0, 500);
-        return bot.sendMessage(lastChatId, `🔍 *Search results for: ${query}*\n\nFound in: \`${path.basename(found[0])}\`\n\n*Data segment:* \n${preview}...`, { parse_mode: 'Markdown' });
+        if (allFound.length === 0) return bot.sendMessage(lastChatId, `🔍 No data found for \`${query}\` in the Zion-Link Fleet.`);
+
+        const bestResult = allFound[0];
+        const preview = fs.readFileSync(bestResult, 'utf-8').substring(0, 500);
+        return bot.sendMessage(lastChatId, `🔍 *Fleet Search: ${query}*\n\nFound in: \`${path.basename(bestResult)}\`\nDrive: \`${bestResult.substring(0, 3)}\`\n\n*Data segment:* \n${preview}...`, { parse_mode: 'Markdown' });
     }
 
     if (text.startsWith('/status')) {
         const freeMem = Math.round(os.freemem() / (1024 * 1024));
         const totalMem = Math.round(os.totalmem() / (1024 * 1024));
-        return bot.sendMessage(lastChatId, `♟️ *Zion-Link Status Report* ♟️\n\n*System Health:* \n- Memory: ${freeMem}MB free / ${totalMem}MB total\n- Gateway: Active (Port 18789)\n- GitHub: Synchronized with Sassy\n- Drive Protocol: Monitoring active`, { parse_mode: 'Markdown' });
+        let driveStatus = DRIVE_FLEET.map(d => `${fs.existsSync(d.path) ? '✅' : '❌'} ${d.name}`).join('\n');
+
+        return bot.sendMessage(lastChatId, `♟️ *Zion-Link Fleet Status* ♟️\n\n*System Health:* \n- Memory: ${freeMem}MB free / ${totalMem}MB total\n- Gateway: Active (Port 18789)\n\n*Drive Synchronization:* \n${driveStatus}`, { parse_mode: 'Markdown' });
     }
 
     // --- 2. AI BRAIN ACCESS (Markco's Persona) ---
@@ -206,40 +229,61 @@ function siblingSync() {
 }
 
 function stevenDirective() {
-    const driveDir = path.join(REPO_DIR, 'GoogleDrive', 'OpenClaw_Family');
-    console.log(`[Markco Hub] Checking Google Drive for Steven's directives in: ${driveDir}`);
+    console.log(`[Markco Hub] Scanning Fleet Dirs for Steven's directives...`);
 
-    if (fs.existsSync(driveDir)) {
-        const files = fs.readdirSync(driveDir);
-        // Look for any file with 'ORDERS' or 'TASK' in the name
-        const orderFiles = files.filter(f => f.toUpperCase().includes('ORDERS') || f.toUpperCase().includes('STEVEN_TASK'));
+    DRIVE_FLEET.forEach(drive => {
+        const targetDir = drive.role === 'active' ? path.join(drive.path, 'OpenClaw_Family') : drive.path;
+        if (!fs.existsSync(targetDir)) return;
 
-        for (const file of orderFiles) {
-            const filePath = path.join(driveDir, file);
-            const content = fs.readFileSync(filePath, 'utf-8');
-            const stats = fs.statSync(filePath);
+        try {
+            const files = fs.readdirSync(targetDir);
+            const orderFiles = files.filter(f => f.toUpperCase().includes('ORDERS') || f.toUpperCase().includes('STEVEN_TASK'));
 
-            // Only alert if the file was modified in the last 15 minutes (POLL_INTERVAL)
-            const now = new Date().getTime();
-            const modified = new Date(stats.mtime).getTime();
+            for (const file of orderFiles) {
+                const filePath = path.join(targetDir, file);
+                const stats = fs.statSync(filePath);
+                const now = new Date().getTime();
+                const modified = new Date(stats.mtime).getTime();
 
-            if (now - modified < POLL_INTERVAL) {
-                console.log(`[Markco Hub] -> NEW DIRECTIVE from Steven: ${file}`);
-                sendAlert(`♟️ *High-Command Directive Detected* ♟️\n\nSteven placed a new order in: \`${file}\`\n\n*Content preview:* \n${content.substring(0, 300)}...`);
+                if (now - modified < POLL_INTERVAL) {
+                    const content = fs.readFileSync(filePath, 'utf-8');
+                    console.log(`[Markco Hub] -> NEW DIRECTIVE found on ${drive.name}: ${file}`);
+                    sendAlert(`♟️ *High-Command Order* (${drive.name})\n\nSource: \`${file}\`\n\n*Message:* \n${content.substring(0, 300)}...`);
 
-                // Track this in BUGS.md as a required action
-                const bugsPath = path.join(REPO_DIR, 'BUGS.md');
-                const logEntry = `\n- **Issue:** [Directive] Steven updated ${file}.\n- **Severity:** [High-Command Order]\n- **Status:** [Processing]\n`;
-                fs.appendFileSync(bugsPath, logEntry);
+                    const bugsPath = path.join(REPO_DIR, 'BUGS.md');
+                    fs.appendFileSync(bugsPath, `\n- **Issue:** [Directive] ${file} updated on ${drive.name}.\n- **Severity:** [High-Command Order]\n- **Status:** [Processing]\n`);
+                }
             }
+        } catch (e) { }
+    });
+}
+
+function backupFleet() {
+    console.log("[Markco Hub] Initiating Fleet Backup Protocol...");
+    // Mirror Primary (G) to Backup (H) and Archive (I)
+    // Only mirror the OpenClaw_Family folder to save space
+    const source = "G:\\My Drive\\OpenClaw_Family";
+    const targets = ["H:\\My Drive\\Markco_Backup", "I:\\My Drive\\Markco_Archive"];
+
+    if (!fs.existsSync(source)) return console.log("[Markco Hub] Backup skipped: Primary drive offline.");
+
+    targets.forEach(target => {
+        try {
+            console.log(`[Markco Hub] Syncing ${source} -> ${target}`);
+            // Robocopy /MIR is fast and efficient
+            execSync(`robocopy "${source}" "${target}" /MIR /R:2 /W:5 /Z /MT:8`, { stdio: 'ignore' });
+        } catch (e) {
+            // Robocopy returns non-zero on success (it uses bitmasks)
+            if (e.status > 8) console.error(`[Markco Hub] Backup to ${target} failed with status: ${e.status}`);
         }
-    }
+    });
 }
 
 function heartbeat() {
-    console.log("[Markco Hub] Heartbeat pulse... Syncing Sibling Loop and Steven's Directives.");
+    console.log("[Markco Hub] Heartbeat pulse... Syncing Fleet and Sibling Loop.");
     siblingSync();
     stevenDirective();
+    backupFleet();
 }
 
 // --- Hot Folder Surveillance (Live File Watcher) ---
