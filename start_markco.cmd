@@ -3,12 +3,12 @@ TITLE Markco Hub Terminal
 SET "REPO_DIR=%~dp0"
 cd /d "%REPO_DIR%"
 echo ============================================================
-echo  [MARKCO HUB] Starting up...
-echo  - Hub Script: %REPO_DIR%markco_hub.js
-echo  - Date: %DATE% %TIME%
+echo  [MARKCO HUB] PM2 Armor Activated
+echo  - Launching and entering PM2 Monit...
 echo ============================================================
 echo.
-node "%REPO_DIR%markco_hub.js"
+npx pm2 start ecosystem.config.js
+npx pm2 monit
 echo.
-echo [MARKCO HUB] Hub has terminated. 
+echo [MARKCO HUB] Monitor closed. (Hub still runs in background)
 pause

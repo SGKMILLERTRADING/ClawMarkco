@@ -12,14 +12,24 @@ const fs = require('fs');
 const path = require('path');
 const TelegramBot = require('node-telegram-bot-api');
 const axios = require('axios');
+const cron = require('node-cron');
+const chokidar = require('chokidar');
+const Tail = require('tail').Tail;
+require('dotenv').config();
 
 // --- Configuration ---
 const REPO_DIR = __dirname;
 const BRANCH_TO_WATCH = 'main';
 const POLL_INTERVAL = 1000 * 60 * 15; // 15 minutes
-const TG_TOKEN = '8652394835:AAG4K5PE4FlXM5jYo5tUxpL3EQjmv2hO1xI';
-const OPENCLAW_URL = 'http://localhost:18789/v1/chat/completions';
-const OPENCLAW_KEY = '722ef5620a5541fdd8e43d0485b994b65b1a1f610bbf9572';
+const TG_TOKEN = process.env.TG_TOKEN || '8652394835:AAG4K5PE4FlXM5jYo5tUxpL3EQjmv2hO1xI';
+const OPENCLAW_URL = process.env.OPENCLAW_URL || 'http://localhost:18789/v1/chat/completions';
+const OPENCLAW_KEY = process.env.OPENCLAW_KEY || '722ef5620a5541fdd8e43d0485b994b65b1a1f610bbf9572';
+
+// --- Lore & Koin Engine ---
+const LORE_FILE = path.join(REPO_DIR, 'lore_book.json');
+const KOIN_FILE = path.join(REPO_DIR, 'KOIN_LOG.md');
+let lore = {};
+if (fs.existsSync(LORE_FILE)) lore = JSON.parse(fs.readFileSync(LORE_FILE, 'utf-8'));
 
 console.log("[Markco Hub] Initializing... System time: " + new Date().toISOString());
 
@@ -60,18 +70,27 @@ bot.on('message', async (msg) => {
     bot.sendChatAction(lastChatId, 'typing');
 
     try {
+        const systemPrompt = `You are ${lore.persona.name}, ${lore.persona.role}. 
+        Setting: ${lore.world.setting}. Tone: ${lore.persona.tone}.
+        Directives: ${lore.persona.directives.join(' ')}.
+        Vocabulary: ${lore.vocabulary.join(', ')}.
+        Current Date/Time: ${new Date().toISOString()}`;
+
         const response = await axios.post(
             OPENCLAW_URL,
             {
                 model: "markco",
-                messages: [{ role: "user", content: text }],
+                messages: [
+                    { role: "system", content: systemPrompt },
+                    { role: "user", content: text }
+                ],
             },
             {
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${OPENCLAW_KEY}`
                 },
-                timeout: 30000
+                timeout: 45000
             }
         );
 
@@ -142,6 +161,32 @@ function stevenDirective() {
     // Placeholder - will integrate with 'gog' skill via gateway later.
 }
 
+// --- Hot Folder Surveillance (Live File Watcher) ---
+const DIRECTIVES_DIR = path.join(REPO_DIR, 'Markco_Directives');
+if (!fs.existsSync(DIRECTIVES_DIR)) fs.mkdirSync(DIRECTIVES_DIR);
+
+chokidar.watch(DIRECTIVES_DIR, { persistent: true, ignoreInitial: true })
+    .on('add', (filePath) => {
+        console.log(`[Hot Folder] New directive dropped: ${filePath}`);
+        sendAlert(`📁 *New Directive Received* \nI just noticed a new note from Dad: \`${path.basename(filePath)}\`. Reviewing inner logic now.`);
+    });
+
+// --- Real-Time Koin Ledger Tailing ---
+const RENDER_LOG = path.join(REPO_DIR, 'render_output.log');
+if (!fs.existsSync(RENDER_LOG)) fs.writeFileSync(RENDER_LOG, ''); // Create mock log if missing
+
+const tail = new Tail(RENDER_LOG);
+tail.on("line", function (data) {
+    if (data.toLowerCase().includes("grimkoin") || data.toLowerCase().includes("promokoin")) {
+        console.log(`[Koin Surveillance] Target Acquired: ${data}`);
+        fs.appendFileSync(KOIN_FILE, `\n| ${new Date().toISOString().split('T')[0]} | LIVE | SYSTEM | N/A | LOGGED | ${data} |`);
+        sendAlert(`🚨 *KOIN ALERT*\nAnomaly detected in rendering log:\n\`${data}\``);
+    }
+});
+tail.on("error", function (error) {
+    console.error('[Koin Surveillance] Tailing error: ', error);
+});
+
 function heartbeat() {
     siblingSync();
     stevenDirective();
@@ -156,4 +201,10 @@ process.on('uncaughtException', (err) => {
     console.error("[CRITICAL] Hub encountered an error:", err);
 });
 
-console.log("[Markco Hub] Lifecycle started. I am watching.");
+// --- Daily Intelligence Briefing ---
+cron.schedule('0 8 * * *', () => {
+    console.log("[Markco Hub] Running Morning Sync...");
+    sendAlert(`🌅 *Morning Sync: Zion-Link Stable*\nBrother, the Hub is active. Sassy's code is continuously monitored and the Koin ledger is running hot. Awaiting today's directives.`);
+});
+
+console.log("[Markco Hub] Lifecycle started. I am watching. PM2 Armor Ready.");

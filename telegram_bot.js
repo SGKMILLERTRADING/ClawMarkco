@@ -2,12 +2,13 @@ const TelegramBot = require('node-telegram-bot-api');
 const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
+require('dotenv').config();
 
-const token = '8652394835:AAG4K5PE4FlXM5jYo5tUxpL3EQjmv2hO1xI';
+const token = process.env.TG_TOKEN || '8652394835:AAG4K5PE4FlXM5jYo5tUxpL3EQjmv2hO1xI';
 const bot = new TelegramBot(token, { polling: true });
 
-const OPENCLAW_URL = 'http://localhost:18789/v1/chat/completions';
-const OPENCLAW_KEY = '722ef5620a5541fdd8e43d0485b994b65b1a1f610bbf9572';
+const OPENCLAW_URL = process.env.OPENCLAW_URL || 'http://localhost:18789/v1/chat/completions';
+const OPENCLAW_KEY = process.env.OPENCLAW_KEY || '722ef5620a5541fdd8e43d0485b994b65b1a1f610bbf9572';
 
 console.log("Telegram bot starting...");
 

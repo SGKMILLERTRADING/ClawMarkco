@@ -3,11 +3,11 @@
 # Updated for Markco Hub (Standard User Permissions)
 # ============================================================
 
-$TaskName      = "MarkcoHub"
-$ScriptDir     = "$PSScriptRoot"
-$HubScript     = "$ScriptDir\markco_hub.js"
-$LogFile       = "$ScriptDir\hub_output.log"
-$NodePath      = (Get-Command node -ErrorAction SilentlyContinue).Source
+$TaskName = "MarkcoHub"
+$ScriptDir = "$PSScriptRoot"
+$HubScript = "$ScriptDir\markco_hub.js"
+$LogFile = "$ScriptDir\hub_output.log"
+$NodePath = (Get-Command node -ErrorAction SilentlyContinue).Source
 
 if (-not $NodePath) {
     Write-Host "[ERROR] Node.js not found in PATH." -ForegroundColor Red
@@ -39,24 +39,25 @@ $result = schtasks /Create `
 if ($result -match "SUCCESS") {
     Write-Host ""
     Write-Host "============================================================" -ForegroundColor Green
-    Write-Host " [SUCCESS] Markco Hub is now a persistent Windows background task!" -ForegroundColor Green
-    Write-Host "  - Runs automatically on Windows Logon" -ForegroundColor Green
-    Write-Host "  - Log output: $LogFile" -ForegroundColor Green
-    Write-Host "  - Terminal Startup: start_markco.cmd (for debugging)" -ForegroundColor Green
+    Write-Host " [SUCCESS] Markco Hub (PM2 Armored) is a persistent task!" -ForegroundColor Green
+    Write-Host "  - Runs automatically on Windows Logon via PM2" -ForegroundColor Green
+    Write-Host "  - PM2 Logs: $ScriptDir\logs\" -ForegroundColor Green
+    Write-Host "  - Terminal Monitor: start_markco.cmd (for live dashboard)" -ForegroundColor Green
     Write-Host "============================================================" -ForegroundColor Green
 
     # Fire the first run immediately
-    Write-Host "`n[Markco] Launching Hub now for initial run..." -ForegroundColor Cyan
+    Write-Host "`n[Markco] Launching PM2 Engine now for initial run..." -ForegroundColor Cyan
     schtasks /Run /TN $TaskName | Out-Null
     Start-Sleep -Seconds 3
 
-    if (Test-Path $LogFile) {
-        Write-Host "`n[Markco] Initial Log Output:" -ForegroundColor Cyan
+    if (Test-Path "$ScriptDir\logs\out.log") {
+        Write-Host "`n[Markco] PM2 Initialization Log:" -ForegroundColor Cyan
         Write-Host "------------------------------------------------------------"
-        Get-Content $LogFile | Select-Object -Last 10
+        Get-Content "$ScriptDir\logs\out.log" | Select-Object -Last 10
         Write-Host "------------------------------------------------------------"
     }
-} else {
+}
+else {
     Write-Host "[ERROR] Task registration failed." -ForegroundColor Red
     Write-Host "Result: $result"
     exit 1
