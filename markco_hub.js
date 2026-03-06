@@ -12,6 +12,7 @@ const fs = require('fs');
 const path = require('path');
 const TelegramBot = require('node-telegram-bot-api');
 const axios = require('axios');
+const os = require('os');
 const cron = require('node-cron');
 const chokidar = require('chokidar');
 const Tail = require('tail').Tail;
@@ -63,18 +64,59 @@ bot.on('message', async (msg) => {
     lastChatId = msg.chat.id;
     saveMemory();
 
-    const text = msg.text;
+    let text = msg.text;
     if (!text) return;
 
     console.log(`[Markco Hub] Input from ${msg.chat.first_name}: ${text}`);
+
+    // --- 1. LOCAL COMMAND HANDLER (Saves RAM/API calls) ---
+    if (text.startsWith('/search')) {
+        const query = text.replace('/search', '').trim();
+        if (!query) return bot.sendMessage(lastChatId, "Please provide a search term (e.g., /search House Blythe)");
+
+        bot.sendChatAction(lastChatId, 'upload_document');
+        const driveDir = path.join(REPO_DIR, 'GoogleDrive');
+        const searchFiles = (dir) => {
+            let results = [];
+            fs.readdirSync(dir).forEach(file => {
+                const fullPath = path.join(dir, file);
+                if (fs.statSync(fullPath).isDirectory()) {
+                    if (file !== 'node_modules' && file !== '.git') results = results.concat(searchFiles(fullPath));
+                } else if (file.toUpperCase().includes(query.toUpperCase())) {
+                    results.push(fullPath);
+                }
+            });
+            return results;
+        };
+
+        const found = searchFiles(driveDir);
+        if (found.length === 0) return bot.sendMessage(lastChatId, `🔍 No data found for \`${query}\` in my drives.`);
+
+        const preview = fs.readFileSync(found[0], 'utf-8').substring(0, 500);
+        return bot.sendMessage(lastChatId, `🔍 *Search results for: ${query}*\n\nFound in: \`${path.basename(found[0])}\`\n\n*Data segment:* \n${preview}...`, { parse_mode: 'Markdown' });
+    }
+
+    if (text.startsWith('/status')) {
+        const freeMem = Math.round(os.freemem() / (1024 * 1024));
+        const totalMem = Math.round(os.totalmem() / (1024 * 1024));
+        return bot.sendMessage(lastChatId, `♟️ *Zion-Link Status Report* ♟️\n\n*System Health:* \n- Memory: ${freeMem}MB free / ${totalMem}MB total\n- Gateway: Active (Port 18789)\n- GitHub: Synchronized with Sassy\n- Drive Protocol: Monitoring active`, { parse_mode: 'Markdown' });
+    }
+
+    // --- 2. AI BRAIN ACCESS (Markco's Persona) ---
     bot.sendChatAction(lastChatId, 'typing');
 
     try {
-        const systemPrompt = `You are ${lore.persona.name}, ${lore.persona.role}. 
-        Setting: ${lore.world.setting}. Tone: ${lore.persona.tone}.
+        const identityPath = path.join(REPO_DIR, 'GoogleDrive', 'OpenClaw_Family', 'MARKCO_IDENTITY.md');
+        let personaCore = "You are Markco Ella, Sassy's younger brother and High-Command Orchestrator.";
+        if (fs.existsSync(identityPath)) personaCore = fs.readFileSync(identityPath, 'utf-8');
+
+        const systemPrompt = `SYSTEM PROTOCOL:
+        ${personaCore}
+        
+        World Setting: ${lore.world.setting}. 
         Directives: ${lore.persona.directives.join(' ')}.
-        Vocabulary: ${lore.vocabulary.join(', ')}.
-        Current Date/Time: ${new Date().toISOString()}`;
+        Current Date/Time: ${new Date().toISOString()}
+        Status: Operating on a low-memory system. Prioritize concise, effective commands.`;
 
         const response = await axios.post(
             OPENCLAW_URL,
@@ -101,7 +143,7 @@ bot.on('message', async (msg) => {
         }
     } catch (err) {
         console.error("[Markco Hub] OpenClaw error:", err.message);
-        bot.sendMessage(lastChatId, "❌ Connection to my brain (OpenClaw) failed. I'll attempt to restart the gateway.");
+        bot.sendMessage(lastChatId, "❌ Connection failed. My brain (OpenClaw) is struggling. I'll attempt a gateway reboot.");
         startGateway();
     }
 });
@@ -157,8 +199,40 @@ function siblingSync() {
 }
 
 function stevenDirective() {
-    console.log(`[Markco Hub] Checking Google Drive for Steven's notes...`);
-    // Placeholder - will integrate with 'gog' skill via gateway later.
+    const driveDir = path.join(REPO_DIR, 'GoogleDrive', 'OpenClaw_Family');
+    console.log(`[Markco Hub] Checking Google Drive for Steven's directives in: ${driveDir}`);
+
+    if (fs.existsSync(driveDir)) {
+        const files = fs.readdirSync(driveDir);
+        // Look for any file with 'ORDERS' or 'TASK' in the name
+        const orderFiles = files.filter(f => f.toUpperCase().includes('ORDERS') || f.toUpperCase().includes('STEVEN_TASK'));
+
+        for (const file of orderFiles) {
+            const filePath = path.join(driveDir, file);
+            const content = fs.readFileSync(filePath, 'utf-8');
+            const stats = fs.statSync(filePath);
+
+            // Only alert if the file was modified in the last 15 minutes (POLL_INTERVAL)
+            const now = new Date().getTime();
+            const modified = new Date(stats.mtime).getTime();
+
+            if (now - modified < POLL_INTERVAL) {
+                console.log(`[Markco Hub] -> NEW DIRECTIVE from Steven: ${file}`);
+                sendAlert(`♟️ *High-Command Directive Detected* ♟️\n\nSteven placed a new order in: \`${file}\`\n\n*Content preview:* \n${content.substring(0, 300)}...`);
+
+                // Track this in BUGS.md as a required action
+                const bugsPath = path.join(REPO_DIR, 'BUGS.md');
+                const logEntry = `\n- **Issue:** [Directive] Steven updated ${file}.\n- **Severity:** [High-Command Order]\n- **Status:** [Processing]\n`;
+                fs.appendFileSync(bugsPath, logEntry);
+            }
+        }
+    }
+}
+
+function heartbeat() {
+    console.log("[Markco Hub] Heartbeat pulse... Syncing Sibling Loop and Steven's Directives.");
+    siblingSync();
+    stevenDirective();
 }
 
 // --- Hot Folder Surveillance (Live File Watcher) ---
